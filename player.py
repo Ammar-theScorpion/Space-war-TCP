@@ -16,6 +16,5 @@ class Player:
         self.y = y
         self.angle = 0
         self.bullets = []
-        self.key = 0
     def add_bullet(self, angle):
         self.bullets.append(Bullet(self.x, self.y, angle))

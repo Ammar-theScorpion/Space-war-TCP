@@ -44,7 +44,7 @@ def render_usertext():
         text_surface = upper_font.render(text.text, True, (0, 0, 0))
         WINDOW.blit(text_surface, (WIDTH-(text_surface.get_width()+10), 10+space))
         space+=20
-        if pygame.time.get_ticks()/1000-text.ctime >= 5:
+        if pygame.time.get_ticks() -text.ctime >= 10000:
             texts.remove(text)
             break
 
@@ -65,10 +65,7 @@ def get_msg(n):
             t = n.get()
             if type(t) is utext:
                 t.ctime += 2 
-                print("he")
                 texts.append(t)
-            else:
-                render_players(t)
         except:
             pass
 def render_bullet(player):
@@ -85,60 +82,117 @@ def render_players(players):
             render_bullet(p)
     except:
         pass
+
+def wait():
+    text_surface = upper_font.render("Waiting for players ...", True, (0, 0, 0))
+    WINDOW.fill(MAIN_COLOR)
+    WINDOW.blit(text_surface, ( WIDTH/2 - text_surface.get_width()/2, HEIGHT/2 - text_surface.get_height()/2))
+    pygame.display.update()
+    
 def main():
     running = True
     global active
     user_text = ''
     starting_time = pygame.time.get_ticks()
-    n2 = Network()
+    n2 = Network(0)
     thread = threading.Thread(target=get_msg, args=(n2, ))
     thread.start()
-    n = Network()
+    n = Network(1)
     player = Player(300, 400)
-    player.key = int(n.get_key())
  
     while running:
         clock.tick(60)
-        
-        p = n.send((player))
-        pos = pygame.mouse.get_pos()
-        dy = pos[1]-player.y
-        dx = pos[0]-player.x
-        angle = 360-math.atan2(dy, dx)*180/math.pi
+        for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    running = False
+                    return
+                if e.type == pygame.MOUSEBUTTONDOWN:
+                    if chat_rect.collidepoint(e.pos):
+                        active = True
+                    else:
+                        active = False
+                        player.add_bullet(math.atan2(dy, dx))
+
+                if e.type == pygame.KEYDOWN:
+                    if active:
+                        if(e.key == pygame.K_RETURN):
+                            send_usertext(n2, user_text, (pygame.time.get_ticks() ) )
+
+                            user_text = ''
+                        else:
+                            user_text += e.unicode
+
+        try:
+            p = n.sendto((player))
+        except socket.error as e:
+            print(e)
+            break
+        if type(p) is not utext:
+            if not p or len(p) == 1:
+                wait()
+                
+            else:
+                pos = pygame.mouse.get_pos()
+                dy = pos[1]-player.y
+                dx = pos[0]-player.x
+                angle = 360-math.atan2(dy, dx)*180/math.pi
+                
+                player.angle = angle
+                rotimage = pygame.transform.rotate(image, angle)
+                recta = rotimage.get_rect(center=(player.x, player.y))
+
+                keys = pygame.key.get_pressed() 
+                move(keys, player, math.atan2(dy, dx))
+                render()
+
+                WINDOW.blit(rotimage, recta) 
+                render_bullet(player)
+                render_input(user_text)
+                render_players(p)
+                render_usertext()
+        pygame.display.update()
+    pygame.quit()
+
+class Button:
+    def __init__(self, str, x, y):
+        self.x = x
+        self.y = y
+        self.str = str
+        self.brect = pygame.Rect(x, y, 150, 90)
+
+    def render(self):
+        pygame.draw.rect(WINDOW, (255, 0, 0), self.brect)   
+        self.render_text()     
+
+    def render_text(self):
+        text_surface = upper_font.render(self.str, True, (0, 0, 0))
+        WINDOW.blit(text_surface, ( self.x+75 - text_surface.get_width()/2 ,  self.y+45 - text_surface.get_height()/2) ) 
+def pre_main():
+    b_play = Button("PLAY", WIDTH/2-75, 150)
+    b_inct = Button("Instractions", WIDTH/2-75, 350)
+
+    running = True
+    while running:
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 running = False
+                pygame.quit()
+                return
             if e.type == pygame.MOUSEBUTTONDOWN:
-                if chat_rect.collidepoint(e.pos):
-                    active = True
-                else:
-                    active = False
-                    player.add_bullet(math.atan2(dy, dx))
+                if b_play.brect.collidepoint(e.pos):
+                    main()
 
-            if e.type == pygame.KEYDOWN:
-                if active:
-                    if(e.key == pygame.K_RETURN):
-                        send_usertext(n2, user_text, (pygame.time.get_ticks()-starting_time)/1000)
 
-                        user_text = ''
-                    else:
-                        user_text += e.unicode
+        
 
-        player.angle = angle
-        rotimage = pygame.transform.rotate(image, angle)
-        recta = rotimage.get_rect(center=(player.x, player.y))
-
-        keys = pygame.key.get_pressed() 
-        move(keys, player, math.atan2(dy, dx))
-        render()
-
-        WINDOW.blit(rotimage, recta) 
-        render_bullet(player)
-        render_input(user_text)
-        render_players(p)
-        render_usertext()
+        WINDOW.fill(MAIN_COLOR)
+        b_play.render()
+        b_inct.render()
         pygame.display.update()
-    pygame.quit()
-main()
+    
+
+
+
+pre_main()
 
 
